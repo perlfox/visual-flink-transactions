@@ -1,3 +1,4 @@
+package com.example.flink.job;
 
 import com.esotericsoftware.minlog.Log;
 import org.apache.flink.api.common.functions.RichMapFunction;
@@ -128,7 +129,28 @@ public class TransactionProcessor {
         }
     }
 
+    public static final String DEFAULT_WEBHOOK_URL = "https://webhook.site/a1b731f8-6003-41f0-948a-6dd9c8c3fa3f";
+
     public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState) throws Exception {
+        execute(env, jobName, maxAccounts, bloatState, false, DEFAULT_WEBHOOK_URL);
+    }
+
+    public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState,
+                                boolean webhookEnabled, String webhookUrl) throws Exception {
+        buildPipeline(env, maxAccounts, bloatState, webhookEnabled, webhookUrl);
+
+        // Execute the Flink job
+        Log.info("Starting Flink Job Execution...");
+        env.execute(jobName);
+        Log.info("Flink Job Started and Running Continuously...");
+    }
+
+    /**
+     * Builds the pipeline graph on the given environment without executing it, so callers
+     * that need a JobClient (e.g. to cancel the job later) can call env.executeAsync(...) themselves.
+     */
+    public static void buildPipeline(StreamExecutionEnvironment env, int maxAccounts, boolean bloatState,
+                                      boolean webhookEnabled, String webhookUrl) {
 
         // Read data from the new Continuous Source
         // This is now an UNBOUNDED source, meaning the job will never finish.
@@ -179,6 +201,9 @@ public class TransactionProcessor {
                         // Optional: Print balance to console for debugging
                         // System.out.println("Account: " + transaction.accountId + " | New Balance: " + newBalance);
 
+                        // In-process fan-out for embedded (control-service) use; no-op otherwise.
+                        TransactionEventBus.publish(transaction);
+
                         return transaction;
                     }
                 })
@@ -192,8 +217,8 @@ public class TransactionProcessor {
                 .uid("filter-alerts-001");
 
         alertsOnly
-                .addSink(new WebhookSink())
-                .name("Webhook.site Alert Sink")
+                .addSink(new WebhookSink(webhookEnabled, webhookUrl))
+                .name("Webhook Alert Sink")
                 .uid("sink-webhook-001");
 
         // Output to STDOUT
@@ -201,11 +226,6 @@ public class TransactionProcessor {
                 .print("Bank Transaction")
                 .name("Stdout Console Logger")
                 .uid("sink-stdout-001");
-
-        // Execute the Flink job
-        Log.info("Starting Flink Job Execution...");
-        env.execute(jobName);
-        Log.info("Flink Job Started and Running Continuously...");
     }
 
 }

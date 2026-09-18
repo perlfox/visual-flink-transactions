@@ -7,6 +7,9 @@ target/
 *.iml
 .settings/
 .project
+.flattened-pom.xml
+dependency-reduced-pom.xml
+__pycache__/
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

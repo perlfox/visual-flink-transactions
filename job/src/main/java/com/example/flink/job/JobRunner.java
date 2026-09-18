@@ -1,3 +1,4 @@
+package com.example.flink.job;
 
 import com.esotericsoftware.minlog.Log;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -31,11 +32,15 @@ public class JobRunner {
 
         boolean bloatState = params.getBoolean("state.bloat", false); // Default to false if not passed
 
+        boolean webhookEnabled = params.getBoolean("webhook.enabled", false);
+        String webhookUrl = params.get("webhook.url", TransactionProcessor.DEFAULT_WEBHOOK_URL);
+
         // Make parameters available globally in your operators (optional)
         env.getConfig().setGlobalJobParameters(params);
-        Log.info("Using Parameters: max.accounts = " + maxAccounts + " & checkpoint.interval = " +  checkpointInterval + " & state.bloat = " + bloatState);
+        Log.info("Using Parameters: max.accounts = " + maxAccounts + " & checkpoint.interval = " +  checkpointInterval
+                + " & state.bloat = " + bloatState + " & webhook.enabled = " + webhookEnabled);
 
         // Call the dedicated pipeline builder
-        TransactionProcessor.execute(env, JOB_NAME, maxAccounts, bloatState);
+        TransactionProcessor.execute(env, JOB_NAME, maxAccounts, bloatState, webhookEnabled, webhookUrl);
     }
 }

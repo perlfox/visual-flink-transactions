@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Transaction Processor Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+    <h1>Flink Transaction Processor</h1>
+    <span id="status-badge" class="badge STOPPED"><span class="dot"></span><span id="status-text">STOPPED</span></span>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="start-btn" class="primary">Start</button>
+</header>
+
+<nav class="tabs">
+    <button class="tab-btn active" data-tab="feed">Live Feed</button>
+    <button class="tab-btn" data-tab="analysis">Analysis</button>
+    <button class="tab-btn" data-tab="config">Configuration</button>
+</nav>
+
+<main>
+    <section id="tab-feed" class="tab-panel active">
+        <div class="card">
+            <h2>Live Transactions</h2>
+            <div class="feed-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Account</th>
+                        <th class="num">Amount</th>
+                        <th>Status</th>
+                        <th class="num">New Balance</th>
+                    </tr>
+                    </thead>
+                    <tbody id="feed-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section id="tab-analysis" class="tab-panel">
+        <div class="tile-row">
+            <div class="tile"><div class="label">Total Transactions</div><div class="value" id="stat-total">0</div></div>
+            <div class="tile"><div class="label">Tx / sec</div><div class="value" id="stat-rate">0</div></div>
+            <div class="tile"><div class="label">Total Volume</div><div class="value" id="stat-volume">$0</div></div>
+            <div class="tile highvalue"><div class="label">High-Value</div><div class="value" id="stat-highvalue">0</div></div>
+            <div class="tile overdraft"><div class="label">Overdrafts</div><div class="value" id="stat-overdraft">0</div></div>
+            <div class="tile"><div class="label">Overdraft Rate</div><div class="value" id="stat-overdraft-rate">0%</div></div>
+        </div>
+
+        <div class="chart-row">
+            <div class="card">
+                <h3>Throughput (tx/sec, last 60s)</h3>
+                <canvas id="chart-rate"></canvas>
+            </div>
+            <div class="card">
+                <h3>Status Distribution</h3>
+                <canvas id="chart-status"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Top Accounts (by |balance|)</h2>
+            <table>
+                <thead><tr><th>Account</th><th class="num">Balance</th></tr></thead>
+                <tbody id="top-accounts-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="tab-config" class="tab-panel">
+        <div class="card">
+            <h2>Job Configuration</h2>
+            <p class="hint">Applied the next time you click Start. Changing these while a job is running has no effect until you stop and start again.</p>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="cfg-max-accounts">Max Accounts</label>
+                    <input type="number" id="cfg-max-accounts" value="4000" min="1">
+                </div>
+                <div class="field">
+                    <label for="cfg-checkpoint">Checkpoint Interval (ms)</label>
+                    <input type="number" id="cfg-checkpoint" value="60000" min="1000">
+                </div>
+                <div class="field checkbox">
+                    <input type="checkbox" id="cfg-state-bloat">
+                    <label for="cfg-state-bloat">Bloat state (~2KB padding per transaction)</label>
+                </div>
+                <div class="field checkbox">
+                    <input type="checkbox" id="cfg-webhook-enabled">
+                    <label for="cfg-webhook-enabled">Enable overdraft webhook</label>
+                </div>
+                <div class="field" style="grid-column: 1 / -1">
+                    <label for="cfg-webhook-url">Webhook URL</label>
+                    <input type="text" id="cfg-webhook-url" value="https://webhook.site/a1b731f8-6003-41f0-948a-6dd9c8c3fa3f">
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
