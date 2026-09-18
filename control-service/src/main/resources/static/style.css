@@ -80,6 +80,8 @@ button {
 }
 
 button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button.danger:hover:not(:disabled) { background: rgba(220,38,38,0.1); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 nav.tabs {
@@ -133,12 +135,46 @@ main {
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 14px 16px;
+    min-width: 0; /* let the tile shrink below its content's natural width inside the grid */
 }
 
 .tile .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.tile .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+.tile .value {
+    font-size: 24px;
+    font-weight: 700;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .tile.overdraft .value { color: var(--danger); }
 .tile.highvalue .value { color: var(--warn); }
+
+.partition-card { margin-bottom: 20px; }
+
+.meta-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.meta-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.meta-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .chart-row {
     display: grid;
@@ -181,7 +217,7 @@ tr.HighAmountTransaction td { color: var(--warn); }
     margin-bottom: 4px;
 }
 
-.field input[type=number], .field input[type=text] {
+.field input[type=number], .field input[type=text], .field select {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid var(--border);

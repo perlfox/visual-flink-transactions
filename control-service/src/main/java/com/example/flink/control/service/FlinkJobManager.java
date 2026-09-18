@@ -5,6 +5,11 @@ import com.example.flink.control.model.JobStatus;
 import com.example.flink.control.model.JobStatusResponse;
 import com.example.flink.job.TransactionEventBus;
 import com.example.flink.job.TransactionProcessor;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.MemorySize;
+import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -25,7 +30,6 @@ public class FlinkJobManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkJobManager.class);
     private static final String JOB_NAME = "Transaction Processor with State";
-    private static final int PARALLELISM = 2;
 
     private final LiveDataStore liveDataStore;
     private final TransactionEventBus.TransactionListener eventListener;
@@ -50,32 +54,45 @@ public class FlinkJobManager {
         if (status != JobStatus.STOPPED && status != JobStatus.FAILED) {
             throw new IllegalStateException("Job is already " + status);
         }
+        config.clamp();
         status = JobStatus.STARTING;
         errorMessage = null;
         currentConfig = config;
         liveDataStore.reset();
 
-        lifecycleExecutor.submit(() -> {
-            try {
-                StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(PARALLELISM);
-                env.enableCheckpointing(config.checkpointIntervalMs);
-                env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
+        lifecycleExecutor.submit(() -> launch(config));
+    }
 
-                TransactionEventBus.subscribe(eventListener);
-                TransactionProcessor.buildPipeline(env, config.maxAccounts, config.stateBloat,
-                        config.webhookEnabled, config.webhookUrl);
+    /** Builds and starts a fresh pipeline. Runs on the lifecycle executor; assumes state is already STARTING. */
+    private void launch(JobConfig config) {
+        try {
+            // Bounds the MiniCluster's own memory pools (managed memory, network buffers, JVM
+            // overhead) instead of letting Flink size them off whatever the host machine has free.
+            Configuration flinkConfig = new Configuration();
+            flinkConfig.set(TaskManagerOptions.TOTAL_PROCESS_MEMORY, MemorySize.ofMebiBytes(config.taskManagerMemoryMb));
 
-                jobClient = env.executeAsync(JOB_NAME);
-                startedAtEpochMs = System.currentTimeMillis();
-                status = JobStatus.RUNNING;
-                LOG.info("Flink job started: {}", config);
-            } catch (Exception e) {
-                LOG.error("Failed to start Flink job", e);
-                TransactionEventBus.unsubscribe(eventListener);
-                errorMessage = e.getMessage();
-                status = JobStatus.FAILED;
-            }
-        });
+            StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(config.parallelism, flinkConfig);
+            env.enableCheckpointing(config.checkpointIntervalMs);
+            env.getCheckpointConfig().setCheckpointingMode(
+                    "AT_LEAST_ONCE".equals(config.checkpointingMode) ? CheckpointingMode.AT_LEAST_ONCE : CheckpointingMode.EXACTLY_ONCE);
+            env.setRestartStrategy(config.restartAttempts <= 0
+                    ? RestartStrategies.noRestart()
+                    : RestartStrategies.fixedDelayRestart(config.restartAttempts, Time.seconds(config.restartDelaySeconds)));
+
+            TransactionEventBus.subscribe(eventListener);
+            TransactionProcessor.buildPipeline(env, config.maxAccounts, config.stateBloat,
+                    config.webhookEnabled, config.webhookUrl, config.maxTransactionsPerSecond);
+
+            jobClient = env.executeAsync(JOB_NAME);
+            startedAtEpochMs = System.currentTimeMillis();
+            status = JobStatus.RUNNING;
+            LOG.info("Flink job started: {}", config);
+        } catch (Exception e) {
+            LOG.error("Failed to start Flink job", e);
+            TransactionEventBus.unsubscribe(eventListener);
+            errorMessage = e.getMessage();
+            status = JobStatus.FAILED;
+        }
     }
 
     public synchronized void stop() {
@@ -103,7 +120,47 @@ public class FlinkJobManager {
         });
     }
 
+    /**
+     * Resets all accumulated data: live feed, aggregates, and account balances.
+     * If a job is running, its account-balance state lives inside Flink's keyed state, so the only
+     * way to truly zero every account is to cancel the current run and start a fresh one with the
+     * same config; otherwise this just clears the leftover data from the last run.
+     */
+    public synchronized void clearData() {
+        if (status == JobStatus.STARTING || status == JobStatus.STOPPING) {
+            throw new IllegalStateException("Job is currently " + status + "; try again shortly");
+        }
+        if (status != JobStatus.RUNNING) {
+            liveDataStore.reset();
+            return;
+        }
+
+        JobConfig config = currentConfig;
+        JobClient client = jobClient;
+        status = JobStatus.STARTING;
+        errorMessage = null;
+
+        lifecycleExecutor.submit(() -> {
+            try {
+                if (client != null) {
+                    client.cancel().get(30, TimeUnit.SECONDS);
+                }
+            } catch (Exception e) {
+                LOG.warn("Error while cancelling Flink job during data clear", e);
+            } finally {
+                TransactionEventBus.unsubscribe(eventListener);
+                jobClient = null;
+                startedAtEpochMs = null;
+            }
+
+            liveDataStore.reset();
+            launch(config);
+        });
+    }
+
     public JobStatusResponse statusResponse() {
-        return new JobStatusResponse(status, currentConfig, startedAtEpochMs, errorMessage);
+        int parallelism = currentConfig != null ? currentConfig.parallelism : new JobConfig().parallelism;
+        return new JobStatusResponse(status, currentConfig, startedAtEpochMs, errorMessage,
+                TransactionProcessor.PARTITION_KEY_FIELD, parallelism);
     }
 }

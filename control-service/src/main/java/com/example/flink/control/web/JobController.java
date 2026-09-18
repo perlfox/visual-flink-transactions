@@ -43,4 +43,14 @@ public class JobController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/clear-data")
+    public ResponseEntity<?> clearData() {
+        try {
+            jobManager.clearData();
+            return ResponseEntity.accepted().body(jobManager.statusResponse());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        }
+    }
 }

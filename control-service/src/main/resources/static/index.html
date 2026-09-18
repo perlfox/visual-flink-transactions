@@ -10,6 +10,7 @@
 <header>
     <h1>Flink Transaction Processor</h1>
     <span id="status-badge" class="badge STOPPED"><span class="dot"></span><span id="status-text">STOPPED</span></span>
+    <button id="clear-btn" class="danger">Clear Data</button>
     <button id="stop-btn" disabled>Stop</button>
     <button id="start-btn" class="primary">Start</button>
 </header>
@@ -18,6 +19,7 @@
     <button class="tab-btn active" data-tab="feed">Live Feed</button>
     <button class="tab-btn" data-tab="analysis">Analysis</button>
     <button class="tab-btn" data-tab="config">Configuration</button>
+    <button class="tab-btn" data-tab="flink">Flink Config</button>
 </nav>
 
 <main>
@@ -42,6 +44,16 @@
     </section>
 
     <section id="tab-analysis" class="tab-panel">
+        <div class="card partition-card">
+            <h2>Partitioning</h2>
+            <div class="meta-row">
+                <div class="meta-item"><span class="meta-label">Key (keyBy)</span><span class="meta-value" id="meta-partition-key">&mdash;</span></div>
+                <div class="meta-item"><span class="meta-label">Parallelism</span><span class="meta-value" id="meta-parallelism">&mdash;</span></div>
+                <div class="meta-item"><span class="meta-label">Key Space (Max Accounts)</span><span class="meta-value" id="meta-max-accounts">&mdash;</span></div>
+            </div>
+            <p class="hint">Transactions are keyed by this field, so every value always lands on the same subtask and keeps its own account-balance state.</p>
+        </div>
+
         <div class="tile-row">
             <div class="tile"><div class="label">Total Transactions</div><div class="value" id="stat-total">0</div></div>
             <div class="tile"><div class="label">Tx / sec</div><div class="value" id="stat-rate">0</div></div>
@@ -78,11 +90,7 @@
             <div class="form-grid">
                 <div class="field">
                     <label for="cfg-max-accounts">Max Accounts</label>
-                    <input type="number" id="cfg-max-accounts" value="4000" min="1">
-                </div>
-                <div class="field">
-                    <label for="cfg-checkpoint">Checkpoint Interval (ms)</label>
-                    <input type="number" id="cfg-checkpoint" value="60000" min="1000">
+                    <input type="number" id="cfg-max-accounts" value="4000" min="1" max="100000">
                 </div>
                 <div class="field checkbox">
                     <input type="checkbox" id="cfg-state-bloat">
@@ -95,6 +103,65 @@
                 <div class="field" style="grid-column: 1 / -1">
                     <label for="cfg-webhook-url">Webhook URL</label>
                     <input type="text" id="cfg-webhook-url" value="https://webhook.site/a1b731f8-6003-41f0-948a-6dd9c8c3fa3f">
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <section id="tab-flink" class="tab-panel">
+        <div class="card partition-card">
+            <h2>Runtime Environment</h2>
+            <div class="meta-row">
+                <div class="meta-item"><span class="meta-label">Flink Version</span><span class="meta-value">1.20.1</span></div>
+                <div class="meta-item"><span class="meta-label">Execution Mode</span><span class="meta-value">Embedded MiniCluster</span></div>
+                <div class="meta-item"><span class="meta-label">State Backend</span><span class="meta-value">HashMap (heap)</span></div>
+                <div class="meta-item"><span class="meta-label">Active Parallelism</span><span class="meta-value" id="meta-flink-parallelism">&mdash;</span></div>
+            </div>
+            <p class="hint">The job runs as a Flink MiniCluster embedded directly inside this Spring Boot server's JVM, sharing its heap and CPU rather than submitting to an external Flink cluster.</p>
+        </div>
+
+        <div class="card">
+            <h2>Execution Settings</h2>
+            <p class="hint">Applied the next time you click Start on the Live Feed tab. Changing these while a job is running has no effect until you stop and start again.</p>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="cfg-parallelism">Parallelism (<span id="parallelism-min">1</span>&ndash;<span id="parallelism-max">8</span>)</label>
+                    <input type="number" id="cfg-parallelism" value="2" min="1" max="8">
+                </div>
+                <div class="field">
+                    <label for="cfg-checkpoint">Checkpoint Interval (ms)</label>
+                    <input type="number" id="cfg-checkpoint" value="60000" min="1000">
+                </div>
+                <div class="field">
+                    <label for="cfg-checkpointing-mode">Checkpointing Mode</label>
+                    <select id="cfg-checkpointing-mode">
+                        <option value="EXACTLY_ONCE">Exactly Once</option>
+                        <option value="AT_LEAST_ONCE">At Least Once</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="cfg-restart-attempts">Restart Attempts (<span id="restart-attempts-min">0</span>&ndash;<span id="restart-attempts-max">10</span>, 0 = no restart)</label>
+                    <input type="number" id="cfg-restart-attempts" value="3" min="0" max="10">
+                </div>
+                <div class="field">
+                    <label for="cfg-restart-delay">Restart Delay (sec)</label>
+                    <input type="number" id="cfg-restart-delay" value="10" min="1" max="300">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Memory Limits</h2>
+            <p class="hint">The pipeline runs embedded in this server's own JVM, so an unthrottled source or an unbounded memory budget can run the host out of memory. Values submitted outside these ranges are clamped to the shown bounds before the job starts.</p>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="cfg-rate-limit">Max Transactions / sec (<span id="rate-limit-min">1</span>&ndash;<span id="rate-limit-max">10000</span>)</label>
+                    <input type="number" id="cfg-rate-limit" value="1000" min="1" max="10000">
+                </div>
+                <div class="field">
+                    <label for="cfg-task-memory">Task Memory Cap, MB (<span id="task-memory-min">512</span>&ndash;<span id="task-memory-max">4096</span>)</label>
+                    <input type="number" id="cfg-task-memory" value="512" min="512" max="4096">
                 </div>
             </div>
         </div>

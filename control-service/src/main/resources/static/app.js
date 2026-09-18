@@ -6,9 +6,27 @@
     const statusText = document.getElementById('status-text');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
+    const clearBtn = document.getElementById('clear-btn');
     const feedBody = document.getElementById('feed-body');
 
     const rateHistory = [];
+
+    const TILE_FONT_MAX = 24;
+    const TILE_FONT_MIN = 12;
+    const META_FONT_MAX = 16;
+    const META_FONT_MIN = 11;
+
+    // Sets text on a dashboard box and shrinks its font until the text fits, so long numbers
+    // (e.g. total volume as it grows) never overflow the box.
+    function setFittedText(el, text, maxFont, minFont) {
+        el.textContent = text;
+        el.style.fontSize = maxFont + 'px';
+        let size = maxFont;
+        while (el.scrollWidth > el.clientWidth && size > minFont) {
+            size -= 1;
+            el.style.fontSize = size + 'px';
+        }
+    }
 
     // --- Tabs ---
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -28,6 +46,11 @@
         const transitioning = data.status === 'STARTING' || data.status === 'STOPPING';
         startBtn.disabled = running || transitioning;
         stopBtn.disabled = !running || transitioning;
+        clearBtn.disabled = transitioning;
+
+        setFittedText(document.getElementById('meta-partition-key'), data.partitionKey || '—', META_FONT_MAX, META_FONT_MIN);
+        setFittedText(document.getElementById('meta-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
+        setFittedText(document.getElementById('meta-flink-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
 
         if (data.config) {
             document.getElementById('cfg-max-accounts').value = data.config.maxAccounts;
@@ -35,6 +58,13 @@
             document.getElementById('cfg-state-bloat').checked = data.config.stateBloat;
             document.getElementById('cfg-webhook-enabled').checked = data.config.webhookEnabled;
             document.getElementById('cfg-webhook-url').value = data.config.webhookUrl;
+            document.getElementById('cfg-rate-limit').value = data.config.maxTransactionsPerSecond;
+            document.getElementById('cfg-task-memory').value = data.config.taskManagerMemoryMb;
+            document.getElementById('cfg-parallelism').value = data.config.parallelism;
+            document.getElementById('cfg-checkpointing-mode').value = data.config.checkpointingMode;
+            document.getElementById('cfg-restart-attempts').value = data.config.restartAttempts;
+            document.getElementById('cfg-restart-delay').value = data.config.restartDelaySeconds;
+            setFittedText(document.getElementById('meta-max-accounts'), data.config.maxAccounts.toLocaleString(), META_FONT_MAX, META_FONT_MIN);
         }
     }
 
@@ -53,7 +83,13 @@
             checkpointIntervalMs: parseInt(document.getElementById('cfg-checkpoint').value, 10) || 60000,
             stateBloat: document.getElementById('cfg-state-bloat').checked,
             webhookEnabled: document.getElementById('cfg-webhook-enabled').checked,
-            webhookUrl: document.getElementById('cfg-webhook-url').value
+            webhookUrl: document.getElementById('cfg-webhook-url').value,
+            maxTransactionsPerSecond: parseInt(document.getElementById('cfg-rate-limit').value, 10) || 1000,
+            taskManagerMemoryMb: parseInt(document.getElementById('cfg-task-memory').value, 10) || 512,
+            parallelism: parseInt(document.getElementById('cfg-parallelism').value, 10) || 2,
+            checkpointingMode: document.getElementById('cfg-checkpointing-mode').value,
+            restartAttempts: parseInt(document.getElementById('cfg-restart-attempts').value, 10) || 0,
+            restartDelaySeconds: parseInt(document.getElementById('cfg-restart-delay').value, 10) || 10
         };
         startBtn.disabled = true;
         const res = await fetch('/api/job/start', {
@@ -69,6 +105,25 @@
         const res = await fetch('/api/job/stop', {method: 'POST'});
         applyStatus(await res.json());
     });
+
+    clearBtn.addEventListener('click', async () => {
+        const running = statusBadge.classList.contains('RUNNING');
+        const message = running
+            ? 'Clear all data? This restarts the job and resets every account to a zero balance.'
+            : 'Clear all data? This resets every account and the live feed/stats.';
+        if (!window.confirm(message)) return;
+
+        clearBtn.disabled = true;
+        resetLocalUiState();
+        const res = await fetch('/api/job/clear-data', {method: 'POST'});
+        applyStatus(await res.json());
+    });
+
+    function resetLocalUiState() {
+        feedBody.innerHTML = '';
+        rateHistory.length = 0;
+        refreshStats();
+    }
 
     // --- Live feed via WebSocket ---
     function connectWebSocket() {
@@ -108,12 +163,12 @@
             const res = await fetch('/api/stats');
             const stats = await res.json();
 
-            document.getElementById('stat-total').textContent = stats.totalTransactions.toLocaleString();
-            document.getElementById('stat-rate').textContent = stats.transactionsPerSecond.toFixed(1);
-            document.getElementById('stat-volume').textContent = fmtMoney(stats.totalVolume);
-            document.getElementById('stat-highvalue').textContent = stats.highValueCount.toLocaleString();
-            document.getElementById('stat-overdraft').textContent = stats.overdraftCount.toLocaleString();
-            document.getElementById('stat-overdraft-rate').textContent = stats.overdraftRatePercent.toFixed(2) + '%';
+            setFittedText(document.getElementById('stat-total'), stats.totalTransactions.toLocaleString(), TILE_FONT_MAX, TILE_FONT_MIN);
+            setFittedText(document.getElementById('stat-rate'), stats.transactionsPerSecond.toFixed(1), TILE_FONT_MAX, TILE_FONT_MIN);
+            setFittedText(document.getElementById('stat-volume'), fmtMoney(stats.totalVolume), TILE_FONT_MAX, TILE_FONT_MIN);
+            setFittedText(document.getElementById('stat-highvalue'), stats.highValueCount.toLocaleString(), TILE_FONT_MAX, TILE_FONT_MIN);
+            setFittedText(document.getElementById('stat-overdraft'), stats.overdraftCount.toLocaleString(), TILE_FONT_MAX, TILE_FONT_MIN);
+            setFittedText(document.getElementById('stat-overdraft-rate'), stats.overdraftRatePercent.toFixed(2) + '%', TILE_FONT_MAX, TILE_FONT_MIN);
 
             const topBody = document.getElementById('top-accounts-body');
             topBody.innerHTML = '';

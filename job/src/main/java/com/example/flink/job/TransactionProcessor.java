@@ -7,10 +7,11 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
+import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import java.io.Serializable;
 import java.util.Random;
+import java.util.concurrent.locks.LockSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +62,7 @@ public class TransactionProcessor {
 
     // --- Continuous Transaction Source ---
 
-    public static class ContinuousTransactionSource implements ParallelSourceFunction<Transaction> {
+    public static class ContinuousTransactionSource extends RichParallelSourceFunction<Transaction> {
 
 
         //This is the system exit. If you click "Cancel" or "Stop" in the UI, or if the Flink cluster needs to shut down for maintenance,
@@ -73,16 +74,36 @@ public class TransactionProcessor {
         private final Random random = new Random();
         private final int maxAccounts;
         private final boolean bloatState;
+        private final int maxTransactionsPerSecond;
+        private long perSubtaskIntervalNanos;
 
 
-        public ContinuousTransactionSource(int maxAccounts, boolean bloatState) {
+        public ContinuousTransactionSource(int maxAccounts, boolean bloatState, int maxTransactionsPerSecond) {
             this.maxAccounts = maxAccounts;
             this.bloatState = bloatState;
+            this.maxTransactionsPerSecond = maxTransactionsPerSecond;
+        }
+
+        @Override
+        public void open(Configuration parameters) {
+            // Unthrottled, this loop emits as fast as the CPU allows (observed >100k tx/sec locally),
+            // which floods checkpoint buffers and GC with garbage. Spread the configured system-wide
+            // cap evenly across parallel subtasks so it holds regardless of parallelism.
+            int subtasks = Math.max(1, getRuntimeContext().getNumberOfParallelSubtasks());
+            int perSubtaskRate = Math.max(1, maxTransactionsPerSecond / subtasks);
+            perSubtaskIntervalNanos = 1_000_000_000L / perSubtaskRate;
         }
 
         @Override
         public void run(SourceFunction.SourceContext<Transaction> ctx) throws Exception {
+            long nextEmitAtNanos = System.nanoTime();
             while (isRunning) {
+                long waitNanos = nextEmitAtNanos - System.nanoTime();
+                if (waitNanos > 0) {
+                    LockSupport.parkNanos(waitNanos);
+                    continue;
+                }
+                nextEmitAtNanos += perSubtaskIntervalNanos;
 
                 // Generate new transaction data
                 long txId = startTransactionIdAt++;
@@ -114,12 +135,6 @@ public class TransactionProcessor {
                 synchronized (ctx.getCheckpointLock()) {
                     ctx.collect(newTransaction);
                 }
-
-                /*
-                 Wait for 1 second before generating the next transaction
-                TimeUnit.SECONDS.sleep(1);
-                TimeUnit.MILLISECONDS.sleep(1); // 1000 trx per sec
-                */
             }
         }
 
@@ -131,13 +146,24 @@ public class TransactionProcessor {
 
     public static final String DEFAULT_WEBHOOK_URL = "https://webhook.site/a1b731f8-6003-41f0-948a-6dd9c8c3fa3f";
 
+    /** Field the pipeline partitions on via keyBy; every transaction for a given value is routed to the same subtask. */
+    public static final String PARTITION_KEY_FIELD = "accountId";
+
+    /** Caps the unthrottled source's output so it can't flood the pipeline with garbage/checkpoint data. */
+    public static final int DEFAULT_MAX_TRANSACTIONS_PER_SECOND = 1000;
+
     public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState) throws Exception {
-        execute(env, jobName, maxAccounts, bloatState, false, DEFAULT_WEBHOOK_URL);
+        execute(env, jobName, maxAccounts, bloatState, false, DEFAULT_WEBHOOK_URL, DEFAULT_MAX_TRANSACTIONS_PER_SECOND);
     }
 
     public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState,
                                 boolean webhookEnabled, String webhookUrl) throws Exception {
-        buildPipeline(env, maxAccounts, bloatState, webhookEnabled, webhookUrl);
+        execute(env, jobName, maxAccounts, bloatState, webhookEnabled, webhookUrl, DEFAULT_MAX_TRANSACTIONS_PER_SECOND);
+    }
+
+    public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState,
+                                boolean webhookEnabled, String webhookUrl, int maxTransactionsPerSecond) throws Exception {
+        buildPipeline(env, maxAccounts, bloatState, webhookEnabled, webhookUrl, maxTransactionsPerSecond);
 
         // Execute the Flink job
         Log.info("Starting Flink Job Execution...");
@@ -150,12 +176,12 @@ public class TransactionProcessor {
      * that need a JobClient (e.g. to cancel the job later) can call env.executeAsync(...) themselves.
      */
     public static void buildPipeline(StreamExecutionEnvironment env, int maxAccounts, boolean bloatState,
-                                      boolean webhookEnabled, String webhookUrl) {
+                                      boolean webhookEnabled, String webhookUrl, int maxTransactionsPerSecond) {
 
         // Read data from the new Continuous Source
         // This is now an UNBOUNDED source, meaning the job will never finish.
         DataStream<Transaction> transactionStream = env
-                .addSource(new ContinuousTransactionSource(maxAccounts, bloatState))
+                .addSource(new ContinuousTransactionSource(maxAccounts, bloatState, maxTransactionsPerSecond))
                 .name("Continuous Transaction Source")
                 .uid("source-001");;
 

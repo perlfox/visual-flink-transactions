@@ -35,12 +35,15 @@ public class JobRunner {
         boolean webhookEnabled = params.getBoolean("webhook.enabled", false);
         String webhookUrl = params.get("webhook.url", TransactionProcessor.DEFAULT_WEBHOOK_URL);
 
+        int maxTransactionsPerSecond = params.getInt("rate.limit", TransactionProcessor.DEFAULT_MAX_TRANSACTIONS_PER_SECOND);
+
         // Make parameters available globally in your operators (optional)
         env.getConfig().setGlobalJobParameters(params);
         Log.info("Using Parameters: max.accounts = " + maxAccounts + " & checkpoint.interval = " +  checkpointInterval
-                + " & state.bloat = " + bloatState + " & webhook.enabled = " + webhookEnabled);
+                + " & state.bloat = " + bloatState + " & webhook.enabled = " + webhookEnabled
+                + " & rate.limit = " + maxTransactionsPerSecond);
 
         // Call the dedicated pipeline builder
-        TransactionProcessor.execute(env, JOB_NAME, maxAccounts, bloatState, webhookEnabled, webhookUrl);
+        TransactionProcessor.execute(env, JOB_NAME, maxAccounts, bloatState, webhookEnabled, webhookUrl, maxTransactionsPerSecond);
     }
 }
