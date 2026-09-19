@@ -1,4 +1,15 @@
-# Bank Transaction Processor Demo / Testing
+# Bank Transaction Processor Demo / Testing / Visualization
+
+This is a fork/extension of the Flink Bank Transaction Processor built by @mitchellg3.
+
+Big changes to the original:
+* **GUI/Visualization** Web based interface to start, stop and configure the simulation
+* **Flink Introspection** Details as to keying, state, classification.  Note that SQL shown is a representation as this project actually calls the Datastream API.
+
+# Screenshots
+<img width="700" height="994" alt="Screenshot From 2026-09-19 11-37-31" src="https://github.com/user-attachments/assets/8c85895d-282c-4f7f-a529-f52ca8169548" />
+
+The original code is available at https://github.com/mitchellg3/flink-transaction-processor.git
 
 A stateful Apache Flink application that processes real-time bank transactions,
 tracks account balances, and flags overdrafts. This is meant to be self-contained (No Kafka or DB for
