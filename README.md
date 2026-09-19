@@ -65,7 +65,7 @@ It also works around two Maven setup issues in this repo:
 - `mvn spring-boot:run` fails with `No plugin found for prefix 'spring-boot'` unless `org.springframework.boot` is registered as a plugin group in `~/.m2/settings.xml` (Maven only auto-searches `org.apache.maven.plugins` / `org.codehaus.mojo` by default). `./run doctor` adds it for you.
 - If your system only has a JRE (no `javac`), `./run` looks for a bundled JDK (e.g. an IDE's `~/.jdks/*` or the VS Code Java extension's) and uses it via `JAVA_HOME` for the Maven calls it makes.
 
-Note: `mvn -pl control-service -am spring-boot:run` (a natural-looking manual invocation) does **not** work in this repo — a bare `plugin:goal` on the CLI runs against every project in the resolved reactor, including the parent `pom`-packaged project, which has no main class. `./run dev` instead installs `job` first, then runs `spring-boot:run` scoped to just `control-service`.
+Note: `mvn -pl control-service -am spring-boot:run` (a natural-looking manual invocation) does **not** work in this repo. A bare `plugin:goal` on the CLI runs against every project in the resolved reactor, including the parent `pom`-packaged project, which has no main class. `./run dev` instead installs `job` first, then runs `spring-boot:run` scoped to just `control-service`.
 
 ## 📦 Setup script (`setup.sh`)
 
@@ -93,10 +93,13 @@ Run the whole thing (Flink job + dashboard) as one process:
 ./run dev
 ```
 
-(See [Run script](#-run-script) for why this isn't a plain `mvn ... spring-boot:run` invocation.) Then open **http://localhost:8080** for:
+(See [Run script](#-run-script) for why this isn't a plain `mvn ... spring-boot:run` invocation.) 
+
+Open **http://localhost:8080** 
 
 The service listens on all network interfaces. From another machine on the same local network, replace `localhost` with the host machine's LAN IP or hostname, for example `http://192.168.1.25:8080`. Ensure the host firewall permits the selected port.
 
+## 
 - **Live Feed** — real-time transaction stream over WebSocket. Click **Interrogate** on any row to pause generation and open a detail panel for that transaction: its key ID (the `accountId` it was partitioned on), the exact key group/subtask Flink routed it to (computed with Flink's real key-group hashing, not a guess), the account balance before/after, and a step-by-step walkthrough — as illustrative SQL, since this pipeline uses the DataStream API rather than Table/SQL — of the keyed-state read, update, classification, and sink routing that produced it. Close the panel (or click Resume) to unpause.
 - **Analysis** — partitioning info (keyBy field, parallelism, key space), throughput, overdraft rate, high-value counts, top accounts by balance.
 - **Configuration** — `maxAccounts`, state bloat toggle, and the overdraft webhook (enable + URL).
@@ -142,3 +145,4 @@ The web control service's Configuration/Flink Config tabs cover the same knobs (
 ## 📅 Roadmap / To-Do
 1. Remove warnings and deprecated code
 2. Clean up and add better comments
+3. Test elsewhere (currently only verified on Ubuntu 26.04)
