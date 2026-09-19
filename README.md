@@ -52,7 +52,7 @@ sources and sinks). **This is built on Flink 1.20**
 
 | Command | What it does |
 | :--- | :--- |
-| `./run` / `./run dev` | Build both modules, launch the web control service at http://localhost:8080. Add `--port 8081` to use a different port. |
+| `./run` / `./run dev` | Build both modules, launch the web control service on all network interfaces at port 8080. Add `--port 8081` to use a different port. |
 | `./run build` | `mvn clean install` for the whole reactor. |
 | `./run test` | `mvn test` for the whole reactor. |
 | `./run package` | Build the standalone shaded job jar into `dist/`, for running the pipeline outside this repo (e.g. on Ververica Cloud or a real Flink cluster). |
@@ -94,6 +94,8 @@ Run the whole thing (Flink job + dashboard) as one process:
 ```
 
 (See [Run script](#-run-script) for why this isn't a plain `mvn ... spring-boot:run` invocation.) Then open **http://localhost:8080** for:
+
+The service listens on all network interfaces. From another machine on the same local network, replace `localhost` with the host machine's LAN IP or hostname, for example `http://192.168.1.25:8080`. Ensure the host firewall permits the selected port.
 
 - **Live Feed** — real-time transaction stream over WebSocket. Click **Interrogate** on any row to pause generation and open a detail panel for that transaction: its key ID (the `accountId` it was partitioned on), the exact key group/subtask Flink routed it to (computed with Flink's real key-group hashing, not a guess), the account balance before/after, and a step-by-step walkthrough — as illustrative SQL, since this pipeline uses the DataStream API rather than Table/SQL — of the keyed-state read, update, classification, and sink routing that produced it. Close the panel (or click Resume) to unpause.
 - **Analysis** — partitioning info (keyBy field, parallelism, key space), throughput, overdraft rate, high-value counts, top accounts by balance.

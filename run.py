@@ -190,7 +190,8 @@ def cmd_dev(args):
 
     env = mvn_env()
     run(["mvn", "-q", "install", "-pl", "job", "-am", "-DskipTests"], env=env)
-    print(f"\033[32mStarting control service on http://localhost:{port} (Ctrl+C to stop)\033[0m")
+    print(f"\033[32mStarting control service on all interfaces at port {port} (Ctrl+C to stop)\033[0m")
+    print(f"\033[32mOpen http://<this-machine-ip>:{port} from another machine on the local network.\033[0m")
     mvn_args = ["mvn", "spring-boot:run"]
     if port != 8080:
         mvn_args.append(f"-Dspring-boot.run.arguments=--server.port={port}")
