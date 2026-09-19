@@ -26,6 +26,14 @@
     <section id="tab-feed" class="tab-panel active">
         <div class="card">
             <h2>Live Transactions</h2>
+            <div class="feed-toolbar">
+                <div class="field feed-rate-field">
+                    <label for="cfg-rate-limit">Max Transactions / sec (<span id="rate-limit-min">1</span>&ndash;<span id="rate-limit-max">10000</span>)</label>
+                    <input type="number" id="cfg-rate-limit" value="1000" min="1" max="10000">
+                </div>
+                <button id="pause-interrogate-btn" class="primary">Pause for Interrogation</button>
+            </div>
+            <p class="hint" id="feed-hint">Max Transactions/sec applies the next time you Start. Click <strong>Pause for Interrogation</strong> to freeze the feed, then click <strong>Interrogate</strong> on any row to see exactly how that transaction was processed.</p>
             <div class="feed-wrap">
                 <table>
                     <thead>
@@ -35,6 +43,7 @@
                         <th class="num">Amount</th>
                         <th>Status</th>
                         <th class="num">New Balance</th>
+                        <th></th>
                     </tr>
                     </thead>
                     <tbody id="feed-body"></tbody>
@@ -153,12 +162,8 @@
 
         <div class="card">
             <h2>Memory Limits</h2>
-            <p class="hint">The pipeline runs embedded in this server's own JVM, so an unthrottled source or an unbounded memory budget can run the host out of memory. Values submitted outside these ranges are clamped to the shown bounds before the job starts.</p>
+            <p class="hint">The pipeline runs embedded in this server's own JVM, so an unbounded memory budget can run the host out of memory. Values submitted outside these ranges are clamped to the shown bounds before the job starts. (Max Transactions/sec now lives on the Live Feed tab.)</p>
             <div class="form-grid">
-                <div class="field">
-                    <label for="cfg-rate-limit">Max Transactions / sec (<span id="rate-limit-min">1</span>&ndash;<span id="rate-limit-max">10000</span>)</label>
-                    <input type="number" id="cfg-rate-limit" value="1000" min="1" max="10000">
-                </div>
                 <div class="field">
                     <label for="cfg-task-memory">Task Memory Cap, MB (<span id="task-memory-min">512</span>&ndash;<span id="task-memory-max">4096</span>)</label>
                     <input type="number" id="cfg-task-memory" value="512" min="512" max="4096">
@@ -172,6 +177,17 @@
         </div>
     </section>
 </main>
+
+<div id="interrogate-overlay" class="overlay hidden">
+    <div class="interrogate-panel">
+        <div class="interrogate-header">
+            <h2>Interrogate Transaction</h2>
+            <button id="interrogate-close-btn">Close</button>
+        </div>
+        <p class="hint">Generation stays paused after you close this &mdash; use <strong>Resume Generation</strong> on the Live Feed tab when you're done interrogating.</p>
+        <div id="interrogate-body" class="interrogate-body"></div>
+    </div>
+</div>
 
 <script src="app.js"></script>
 </body>

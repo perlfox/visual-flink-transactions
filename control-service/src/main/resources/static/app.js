@@ -10,8 +10,13 @@
     const saveBtn = document.getElementById('save-config-btn');
     const saveStatus = document.getElementById('save-status');
     const feedBody = document.getElementById('feed-body');
+    const interrogateOverlay = document.getElementById('interrogate-overlay');
+    const interrogateBody = document.getElementById('interrogate-body');
+    const interrogateCloseBtn = document.getElementById('interrogate-close-btn');
+    const pauseInterrogateBtn = document.getElementById('pause-interrogate-btn');
 
     const rateHistory = [];
+    let generationPaused = false;
 
     const TILE_FONT_MAX = 24;
     const TILE_FONT_MIN = 12;
@@ -85,6 +90,8 @@
         stopBtn.disabled = !running || transitioning;
         clearBtn.disabled = transitioning;
         saveBtn.disabled = running || transitioning;
+        pauseInterrogateBtn.disabled = !running || transitioning;
+        setGenerationPaused(running && !!data.generationPaused);
 
         setFittedText(document.getElementById('meta-partition-key'), data.partitionKey || '—', META_FONT_MAX, META_FONT_MIN);
         setFittedText(document.getElementById('meta-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
@@ -95,6 +102,13 @@
             if (opts.syncForm) {
                 applyConfigToForm(data.config);
             }
+        }
+
+        // A Stop (or a fresh Start/Clear Data) cancels the whole pipeline, which makes any open
+        // interrogation stale; drop it rather than leave the feed looking paused forever.
+        if (!running && !interrogateOverlay.classList.contains('hidden')) {
+            interrogateOverlay.classList.add('hidden');
+            interrogateBody.innerHTML = '';
         }
     }
 
@@ -189,12 +203,114 @@
             '<td>' + tx.accountId + '</td>' +
             '<td class="mono">' + tx.amount.toFixed(2) + '</td>' +
             '<td>' + tx.processingStatus + '</td>' +
-            '<td class="mono">' + tx.newBalance.toFixed(2) + '</td>';
+            '<td class="mono">' + tx.newBalance.toFixed(2) + '</td>' +
+            '<td><button class="small interrogate-btn' + (generationPaused ? '' : ' hidden') + '" data-tx-id="' + tx.transactionId + '">Interrogate</button></td>';
         feedBody.insertBefore(row, feedBody.firstChild);
         while (feedBody.rows.length > MAX_FEED_ROWS) {
             feedBody.deleteRow(feedBody.rows.length - 1);
         }
     }
+
+    // --- Interrogate mode ---
+    // Reflects the current pause state into the toolbar toggle and every row's Interrogate button.
+    // Rows only offer Interrogate once generation is actually paused, so "pause first, then drill
+    // into whichever rows you like" is the only path through this UI.
+    function setGenerationPaused(paused) {
+        generationPaused = paused;
+        pauseInterrogateBtn.textContent = paused ? 'Resume Generation' : 'Pause for Interrogation';
+        pauseInterrogateBtn.classList.toggle('primary', !paused);
+        pauseInterrogateBtn.classList.toggle('danger', paused);
+        feedBody.querySelectorAll('.interrogate-btn').forEach(btn => btn.classList.toggle('hidden', !paused));
+    }
+
+    pauseInterrogateBtn.addEventListener('click', async () => {
+        pauseInterrogateBtn.disabled = true;
+        try {
+            const url = generationPaused ? '/api/interrogate/resume' : '/api/interrogate/pause';
+            const res = await fetch(url, {method: 'POST'});
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || ('HTTP ' + res.status));
+            }
+            setGenerationPaused(data.paused);
+            if (!data.paused) {
+                interrogateOverlay.classList.add('hidden');
+                interrogateBody.innerHTML = '';
+            }
+        } catch (e) {
+            alert('Could not change pause state: ' + e.message);
+        } finally {
+            pauseInterrogateBtn.disabled = false;
+        }
+    });
+
+    feedBody.addEventListener('click', async (event) => {
+        const btn = event.target.closest('.interrogate-btn');
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+            const res = await fetch('/api/interrogate/' + btn.dataset.txId, {method: 'POST'});
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || ('HTTP ' + res.status));
+            }
+            setGenerationPaused(true);
+            renderInterrogationReport(data);
+            interrogateOverlay.classList.remove('hidden');
+        } catch (e) {
+            alert('Could not interrogate transaction: ' + e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    function renderInterrogationReport(report) {
+        const tx = report.transaction;
+        const time = new Date(tx.timestamp).toLocaleString();
+
+        let html = '';
+        html += '<div class="meta-row">';
+        html += metaItem('Key ID (' + report.partitionField + ')', tx.accountId);
+        html += metaItem('Transaction ID', tx.transactionId);
+        html += metaItem('Time', time);
+        html += metaItem('Amount', tx.amount.toFixed(2));
+        html += metaItem('Classification', report.classification);
+        html += metaItem('Routing', 'keyGroup ' + report.keyGroup + ' → subtask ' + report.assignedSubtask + ' of ' + report.parallelism
+            + ' (max parallelism ' + report.maxParallelism + ')', true);
+        html += '</div>';
+
+        html += '<h3>Flink SQL walkthrough (illustrative &mdash; this job uses the DataStream API, not Table/SQL)</h3>';
+        (report.steps || []).forEach(step => {
+            html += '<div class="interrogate-step">';
+            html += '<h4>' + escapeHtml(step.title) + '</h4>';
+            html += '<pre>' + escapeHtml(step.sql) + '</pre>';
+            html += '<div class="result">&rarr; ' + escapeHtml(step.result) + '</div>';
+            html += '</div>';
+        });
+
+        interrogateBody.innerHTML = html;
+    }
+
+    function metaItem(label, value, wide) {
+        return '<div class="meta-item' + (wide ? ' wide' : '') + '"><span class="meta-label">' + escapeHtml(label) + '</span>' +
+            '<span class="meta-value">' + escapeHtml(String(value)) + '</span></div>';
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    // Closing the report just hides it — generation stays paused (browse another row, or hit
+    // Resume Generation on the toolbar) until the user explicitly unpauses.
+    function closeInterrogation() {
+        interrogateOverlay.classList.add('hidden');
+        interrogateBody.innerHTML = '';
+    }
+
+    interrogateCloseBtn.addEventListener('click', closeInterrogation);
 
     // --- Stats + charts ---
     function fmtMoney(n) {

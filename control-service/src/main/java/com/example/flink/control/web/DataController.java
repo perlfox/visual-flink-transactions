@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/** Read-only access to the current run's buffered transactions and live aggregates. */
 @RestController
 @RequestMapping("/api")
 public class DataController {
@@ -20,11 +21,13 @@ public class DataController {
         this.liveDataStore = liveDataStore;
     }
 
+    /** Most recent buffered transactions, newest first; limit is capped at 5000 (the buffer's own cap). */
     @GetMapping("/transactions/recent")
-    public List<TransactionView> recent(@RequestParam(defaultValue = "200") int limit) {
+    public List<TransactionView> recent(@RequestParam(name = "limit", defaultValue = "200") int limit) {
         return liveDataStore.recent(Math.min(limit, 5000));
     }
 
+    /** Live totals (volume, counts, top accounts) for the currently (or most recently) running job. */
     @GetMapping("/stats")
     public StatsResponse stats() {
         return liveDataStore.stats();

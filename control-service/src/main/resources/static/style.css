@@ -194,6 +194,21 @@ th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--bord
 th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
 td.mono, th.num { font-family: var(--mono); }
 
+.feed-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 4px;
+}
+
+.feed-rate-field { max-width: 260px; }
+
+#feed-hint { margin-top: 8px; }
+
+.feed-toolbar button { flex: none; white-space: nowrap; padding: 6px 14px; font-size: 13px; }
+
+.interrogate-btn.hidden { display: none; }
+
 .feed-wrap { max-height: 480px; overflow-y: auto; }
 
 tr.OVERDRAFT_WARNING td { color: var(--danger); }
@@ -238,3 +253,77 @@ tr.HighAmountTransaction td { color: var(--warn); }
 
 h2 { font-size: 15px; margin: 0 0 12px; }
 h3 { font-size: 13px; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+
+button.small { padding: 4px 10px; font-size: 12px; }
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.overlay.hidden { display: none; }
+
+.interrogate-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    max-width: 760px;
+    width: 100%;
+}
+
+.interrogate-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.interrogate-header h2 { margin: 0; }
+
+.interrogate-panel .meta-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+.interrogate-panel .meta-item.wide { grid-column: 1 / -1; }
+
+.interrogate-panel .meta-value {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+}
+
+.interrogate-body { margin-top: 12px; }
+
+.interrogate-step {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+
+.interrogate-step h4 { margin: 0 0 8px; font-size: 13px; }
+
+.interrogate-step pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0 0 8px;
+}
+
+.interrogate-step .result {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ok);
+}

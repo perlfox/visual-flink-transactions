@@ -10,6 +10,7 @@ public class TransactionView {
     public double amount;
     public long timestamp;
     public String processingStatus;
+    public double accountBalance;
     public double newBalance;
 
     public static TransactionView from(TransactionProcessor.Transaction t) {
@@ -19,6 +20,7 @@ public class TransactionView {
         view.amount = t.amount;
         view.timestamp = t.timestamp;
         view.processingStatus = t.processingStatus;
+        view.accountBalance = t.accountBalance;
         view.newBalance = t.newBalance;
         return view;
     }

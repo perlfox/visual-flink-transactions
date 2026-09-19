@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -95,6 +96,13 @@ public class LiveDataStore {
             List<TransactionView> all = new ArrayList<>(buffer);
             int fromIndex = Math.max(0, all.size() - limit);
             return new ArrayList<>(all.subList(fromIndex, all.size()));
+        }
+    }
+
+    /** Looks up a single buffered transaction by id, for the Live Feed's "Interrogate" detail view. */
+    public Optional<TransactionView> findById(long transactionId) {
+        synchronized (bufferLock) {
+            return buffer.stream().filter(v -> v.transactionId == transactionId).findFirst();
         }
     }
 

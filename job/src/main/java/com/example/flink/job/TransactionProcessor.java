@@ -5,6 +5,7 @@ import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
@@ -98,6 +99,14 @@ public class TransactionProcessor {
         public void run(SourceFunction.SourceContext<Transaction> ctx) throws Exception {
             long nextEmitAtNanos = System.nanoTime();
             while (isRunning) {
+                if (TransactionSourceControl.isPaused()) {
+                    // Interrogate mode: freeze generation entirely. Re-anchor the emit clock on
+                    // resume so we don't burst-emit a backlog of "missed" transactions.
+                    LockSupport.parkNanos(50_000_000L);
+                    nextEmitAtNanos = System.nanoTime();
+                    continue;
+                }
+
                 long waitNanos = nextEmitAtNanos - System.nanoTime();
                 if (waitNanos > 0) {
                     LockSupport.parkNanos(waitNanos);
@@ -151,6 +160,25 @@ public class TransactionProcessor {
 
     /** Caps the unthrottled source's output so it can't flood the pipeline with garbage/checkpoint data. */
     public static final int DEFAULT_MAX_TRANSACTIONS_PER_SECOND = 1000;
+
+    /**
+     * The max parallelism Flink assigns a keyed stream by default when none is set explicitly on
+     * the job, given its operator parallelism. keyBy hashes every key into one of this many key
+     * groups, which are then split evenly across the parallel subtasks.
+     */
+    public static int defaultMaxParallelism(int parallelism) {
+        return KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
+    }
+
+    /** Which key group {@code keyBy(accountId)} would hash the given key into. */
+    public static int keyGroupForKey(String key, int parallelism) {
+        return KeyGroupRangeAssignment.assignToKeyGroup(key, defaultMaxParallelism(parallelism));
+    }
+
+    /** Which parallel subtask (of {@code parallelism}) {@code keyBy(accountId)} routes the given key to. */
+    public static int subtaskForKey(String key, int parallelism) {
+        return KeyGroupRangeAssignment.assignKeyToParallelOperator(key, defaultMaxParallelism(parallelism), parallelism);
+    }
 
     public static void execute(StreamExecutionEnvironment env, String jobName, int maxAccounts, boolean bloatState) throws Exception {
         execute(env, jobName, maxAccounts, bloatState, false, DEFAULT_WEBHOOK_URL, DEFAULT_MAX_TRANSACTIONS_PER_SECOND);

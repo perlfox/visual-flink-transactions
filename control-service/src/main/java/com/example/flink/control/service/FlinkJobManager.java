@@ -5,6 +5,7 @@ import com.example.flink.control.model.JobStatus;
 import com.example.flink.control.model.JobStatusResponse;
 import com.example.flink.job.TransactionEventBus;
 import com.example.flink.job.TransactionProcessor;
+import com.example.flink.job.TransactionSourceControl;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -66,6 +67,9 @@ public class FlinkJobManager {
     /** Builds and starts a fresh pipeline. Runs on the lifecycle executor; assumes state is already STARTING. */
     private void launch(JobConfig config) {
         try {
+            // A prior run may have been left paused mid-interrogation; every fresh run starts unpaused.
+            TransactionSourceControl.resume();
+
             // Bounds the MiniCluster's own memory pools (managed memory, network buffers, JVM
             // overhead) instead of letting Flink size them off whatever the host machine has free.
             Configuration flinkConfig = new Configuration();
@@ -172,8 +176,27 @@ public class FlinkJobManager {
         return statusResponse();
     }
 
+    /**
+     * Freezes the mock source (no new transactions) so the Live Feed's "Interrogate" mode can hold
+     * a transaction on screen without it scrolling away. The job itself keeps running.
+     */
+    public synchronized void pauseGeneration() {
+        if (status != JobStatus.RUNNING) {
+            throw new IllegalStateException("Job is not running (status=" + status + ")");
+        }
+        TransactionSourceControl.pause();
+    }
+
+    public void resumeGeneration() {
+        TransactionSourceControl.resume();
+    }
+
+    public boolean isGenerationPaused() {
+        return TransactionSourceControl.isPaused();
+    }
+
     public JobStatusResponse statusResponse() {
         return new JobStatusResponse(status, currentConfig, startedAtEpochMs, errorMessage,
-                TransactionProcessor.PARTITION_KEY_FIELD, currentConfig.parallelism);
+                TransactionProcessor.PARTITION_KEY_FIELD, currentConfig.parallelism, isGenerationPaused());
     }
 }

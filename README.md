@@ -13,6 +13,7 @@ sources and sinks). **This is built on Flink 1.20**
 * **Self-Contained Testing:** Includes a built-in SourceFunction that generates mock banking traffic, making it 100% runnable out of the box.
 * **Real-time Filtering**: The pipeline automatically bifurcates the data stream using a side-logic filter. It classifies transactions into `Standard`, `HighAmountTransaction`, or `OVERDRAFT_WARNING`.
 * **Web Control Service:** A Spring Boot app that embeds a Flink local MiniCluster and serves a dashboard for live data, configuration, and job lifecycle control — see below.
+* **Interrogate Mode:** Pause the live feed and inspect exactly how one transaction was processed — its partition key, real key-group/subtask routing, and a SQL-style walkthrough of the state read/update/classification logic.
 
 ## 🛠️ Setup & Running
 
@@ -75,7 +76,7 @@ Run the whole thing (Flink job + dashboard) as one process:
 
 (See [Run script](#-run-script) for why this isn't a plain `mvn ... spring-boot:run` invocation.) Then open **http://localhost:8080** for:
 
-- **Live Feed** — real-time transaction stream over WebSocket.
+- **Live Feed** — real-time transaction stream over WebSocket. Click **Interrogate** on any row to pause generation and open a detail panel for that transaction: its key ID (the `accountId` it was partitioned on), the exact key group/subtask Flink routed it to (computed with Flink's real key-group hashing, not a guess), the account balance before/after, and a step-by-step walkthrough — as illustrative SQL, since this pipeline uses the DataStream API rather than Table/SQL — of the keyed-state read, update, classification, and sink routing that produced it. Close the panel (or click Resume) to unpause.
 - **Analysis** — partitioning info (keyBy field, parallelism, key space), throughput, overdraft rate, high-value counts, top accounts by balance.
 - **Configuration** — `maxAccounts`, state bloat toggle, and the overdraft webhook (enable + URL).
 - **Flink Config** — runtime environment info (Flink version, execution mode, state backend, active parallelism), and the execution/memory settings below:
