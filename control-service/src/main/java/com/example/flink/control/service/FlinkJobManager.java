@@ -40,7 +40,7 @@ public class FlinkJobManager {
     });
 
     private volatile JobStatus status = JobStatus.STOPPED;
-    private volatile JobConfig currentConfig;
+    private volatile JobConfig currentConfig = new JobConfig();
     private volatile Long startedAtEpochMs;
     private volatile String errorMessage;
     private volatile JobClient jobClient;
@@ -158,9 +158,22 @@ public class FlinkJobManager {
         });
     }
 
+    /**
+     * Persists a config server-side without starting a job, so the UI can save settings (and have
+     * them survive status polls) ahead of clicking Start. Rejected while a job is running/transitioning,
+     * since that config is already live and shouldn't be silently swapped out from under it.
+     */
+    public synchronized JobStatusResponse updateConfig(JobConfig config) {
+        if (status == JobStatus.RUNNING || status == JobStatus.STARTING || status == JobStatus.STOPPING) {
+            throw new IllegalStateException("Cannot save configuration while job is " + status);
+        }
+        config.clamp();
+        currentConfig = config;
+        return statusResponse();
+    }
+
     public JobStatusResponse statusResponse() {
-        int parallelism = currentConfig != null ? currentConfig.parallelism : new JobConfig().parallelism;
         return new JobStatusResponse(status, currentConfig, startedAtEpochMs, errorMessage,
-                TransactionProcessor.PARTITION_KEY_FIELD, parallelism);
+                TransactionProcessor.PARTITION_KEY_FIELD, currentConfig.parallelism);
     }
 }

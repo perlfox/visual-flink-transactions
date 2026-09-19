@@ -123,7 +123,7 @@
 
         <div class="card">
             <h2>Execution Settings</h2>
-            <p class="hint">Applied the next time you click Start on the Live Feed tab. Changing these while a job is running has no effect until you stop and start again.</p>
+            <p class="hint">Applied the next time you click Start on the Live Feed tab, or click Save Configuration below to persist changes without starting. Changing these while a job is running has no effect until you stop and start again.</p>
             <div class="form-grid">
                 <div class="field">
                     <label for="cfg-parallelism">Parallelism (<span id="parallelism-min">1</span>&ndash;<span id="parallelism-max">8</span>)</label>
@@ -164,6 +164,11 @@
                     <input type="number" id="cfg-task-memory" value="512" min="512" max="4096">
                 </div>
             </div>
+        </div>
+
+        <div class="save-row">
+            <button id="save-config-btn" class="primary">Save Configuration</button>
+            <span id="save-status" class="hint save-status"></span>
         </div>
     </section>
 </main>

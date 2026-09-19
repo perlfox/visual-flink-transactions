@@ -231,5 +231,10 @@ tr.HighAmountTransaction td { color: var(--warn); }
 
 .hint { font-size: 12px; color: var(--muted); margin-top: -8px; margin-bottom: 16px; }
 
+.save-row { display: flex; align-items: center; gap: 12px; }
+.save-status { margin: 0; min-height: 1em; }
+.save-status.ok { color: var(--ok); }
+.save-status.error { color: var(--danger); }
+
 h2 { font-size: 15px; margin: 0 0 12px; }
 h3 { font-size: 13px; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.03em; }

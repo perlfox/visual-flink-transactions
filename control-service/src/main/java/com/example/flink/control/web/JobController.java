@@ -34,6 +34,15 @@ public class JobController {
         }
     }
 
+    @PostMapping("/config")
+    public ResponseEntity<?> updateConfig(@RequestBody(required = false) JobConfig config) {
+        try {
+            return ResponseEntity.ok(jobManager.updateConfig(config != null ? config : new JobConfig()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/stop")
     public ResponseEntity<?> stop() {
         try {

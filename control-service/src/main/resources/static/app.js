@@ -7,6 +7,8 @@
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const clearBtn = document.getElementById('clear-btn');
+    const saveBtn = document.getElementById('save-config-btn');
+    const saveStatus = document.getElementById('save-status');
     const feedBody = document.getElementById('feed-body');
 
     const rateHistory = [];
@@ -39,46 +41,26 @@
     });
 
     // --- Status polling ---
-    function applyStatus(data) {
-        statusBadge.className = 'badge ' + data.status;
-        statusText.textContent = data.status;
-        const running = data.status === 'RUNNING';
-        const transitioning = data.status === 'STARTING' || data.status === 'STOPPING';
-        startBtn.disabled = running || transitioning;
-        stopBtn.disabled = !running || transitioning;
-        clearBtn.disabled = transitioning;
-
-        setFittedText(document.getElementById('meta-partition-key'), data.partitionKey || '—', META_FONT_MAX, META_FONT_MIN);
-        setFittedText(document.getElementById('meta-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
-        setFittedText(document.getElementById('meta-flink-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
-
-        if (data.config) {
-            document.getElementById('cfg-max-accounts').value = data.config.maxAccounts;
-            document.getElementById('cfg-checkpoint').value = data.config.checkpointIntervalMs;
-            document.getElementById('cfg-state-bloat').checked = data.config.stateBloat;
-            document.getElementById('cfg-webhook-enabled').checked = data.config.webhookEnabled;
-            document.getElementById('cfg-webhook-url').value = data.config.webhookUrl;
-            document.getElementById('cfg-rate-limit').value = data.config.maxTransactionsPerSecond;
-            document.getElementById('cfg-task-memory').value = data.config.taskManagerMemoryMb;
-            document.getElementById('cfg-parallelism').value = data.config.parallelism;
-            document.getElementById('cfg-checkpointing-mode').value = data.config.checkpointingMode;
-            document.getElementById('cfg-restart-attempts').value = data.config.restartAttempts;
-            document.getElementById('cfg-restart-delay').value = data.config.restartDelaySeconds;
-            setFittedText(document.getElementById('meta-max-accounts'), data.config.maxAccounts.toLocaleString(), META_FONT_MAX, META_FONT_MIN);
-        }
+    // Config inputs are only ever written from the server on initial load and right after a
+    // Start/Save response (so the UI can snap to server-clamped values). The periodic status poll
+    // must NOT touch them, or it would overwrite whatever the user is currently typing every few
+    // seconds with whatever config is still saved server-side.
+    function applyConfigToForm(config) {
+        document.getElementById('cfg-max-accounts').value = config.maxAccounts;
+        document.getElementById('cfg-checkpoint').value = config.checkpointIntervalMs;
+        document.getElementById('cfg-state-bloat').checked = config.stateBloat;
+        document.getElementById('cfg-webhook-enabled').checked = config.webhookEnabled;
+        document.getElementById('cfg-webhook-url').value = config.webhookUrl;
+        document.getElementById('cfg-rate-limit').value = config.maxTransactionsPerSecond;
+        document.getElementById('cfg-task-memory').value = config.taskManagerMemoryMb;
+        document.getElementById('cfg-parallelism').value = config.parallelism;
+        document.getElementById('cfg-checkpointing-mode').value = config.checkpointingMode;
+        document.getElementById('cfg-restart-attempts').value = config.restartAttempts;
+        document.getElementById('cfg-restart-delay').value = config.restartDelaySeconds;
     }
 
-    async function refreshStatus() {
-        try {
-            const res = await fetch('/api/job/status');
-            applyStatus(await res.json());
-        } catch (e) {
-            // server may be restarting; ignore transient failures
-        }
-    }
-
-    startBtn.addEventListener('click', async () => {
-        const config = {
+    function collectConfigFromForm() {
+        return {
             maxAccounts: parseInt(document.getElementById('cfg-max-accounts').value, 10) || 4000,
             checkpointIntervalMs: parseInt(document.getElementById('cfg-checkpoint').value, 10) || 60000,
             stateBloat: document.getElementById('cfg-state-bloat').checked,
@@ -91,19 +73,80 @@
             restartAttempts: parseInt(document.getElementById('cfg-restart-attempts').value, 10) || 0,
             restartDelaySeconds: parseInt(document.getElementById('cfg-restart-delay').value, 10) || 10
         };
+    }
+
+    function applyStatus(data, opts) {
+        opts = opts || {};
+        statusBadge.className = 'badge ' + data.status;
+        statusText.textContent = data.status;
+        const running = data.status === 'RUNNING';
+        const transitioning = data.status === 'STARTING' || data.status === 'STOPPING';
+        startBtn.disabled = running || transitioning;
+        stopBtn.disabled = !running || transitioning;
+        clearBtn.disabled = transitioning;
+        saveBtn.disabled = running || transitioning;
+
+        setFittedText(document.getElementById('meta-partition-key'), data.partitionKey || '—', META_FONT_MAX, META_FONT_MIN);
+        setFittedText(document.getElementById('meta-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
+        setFittedText(document.getElementById('meta-flink-parallelism'), data.parallelism != null ? String(data.parallelism) : '—', META_FONT_MAX, META_FONT_MIN);
+
+        if (data.config) {
+            setFittedText(document.getElementById('meta-max-accounts'), data.config.maxAccounts.toLocaleString(), META_FONT_MAX, META_FONT_MIN);
+            if (opts.syncForm) {
+                applyConfigToForm(data.config);
+            }
+        }
+    }
+
+    async function refreshStatus(opts) {
+        try {
+            const res = await fetch('/api/job/status');
+            applyStatus(await res.json(), opts);
+        } catch (e) {
+            // server may be restarting; ignore transient failures
+        }
+    }
+
+    startBtn.addEventListener('click', async () => {
+        const config = collectConfigFromForm();
         startBtn.disabled = true;
         const res = await fetch('/api/job/start', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(config)
         });
-        applyStatus(await res.json());
+        applyStatus(await res.json(), {syncForm: true});
     });
 
     stopBtn.addEventListener('click', async () => {
         stopBtn.disabled = true;
         const res = await fetch('/api/job/stop', {method: 'POST'});
         applyStatus(await res.json());
+    });
+
+    saveBtn.addEventListener('click', async () => {
+        const config = collectConfigFromForm();
+        saveBtn.disabled = true;
+        saveStatus.textContent = '';
+        saveStatus.className = 'hint save-status';
+        try {
+            const res = await fetch('/api/job/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || ('HTTP ' + res.status));
+            }
+            applyStatus(await res.json(), {syncForm: true});
+            saveStatus.textContent = 'Saved.';
+            saveStatus.classList.add('ok');
+        } catch (e) {
+            saveStatus.textContent = 'Save failed: ' + e.message;
+            saveStatus.classList.add('error');
+        }
+        setTimeout(() => { saveStatus.textContent = ''; saveStatus.className = 'hint save-status'; }, 4000);
     });
 
     clearBtn.addEventListener('click', async () => {
@@ -244,7 +287,7 @@
     }
 
     connectWebSocket();
-    refreshStatus();
+    refreshStatus({syncForm: true});
     setInterval(refreshStatus, 3000);
     refreshStats();
     setInterval(refreshStats, 1000);
