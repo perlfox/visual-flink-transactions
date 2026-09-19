@@ -17,7 +17,7 @@ Introspection
 Control GUI
 <img width="961" height="615" alt="Screenshot From 2026-09-19 11-39-58" src="https://github.com/user-attachments/assets/fd78dcfd-688e-4b26-b958-549577bb28ce" />
 
-##Overview
+## Overview
 A stateful Apache Flink application that processes real-time bank transactions,
 tracks account balances, and flags overdrafts. This is meant to be self-contained (No Kafka or DB for
 sources and sinks). **This is built on Flink 1.20**
