@@ -30,14 +30,14 @@ sources and sinks). **This is built on Flink 1.20**
 * **Configurable Restart Strategy:** Fixed-delay restarts on failure, with attempts and delay both configurable (or disabled entirely).
 * **Self-Contained Testing:** Includes a built-in SourceFunction that generates mock banking traffic, making it 100% runnable out of the box.
 * **Real-time Filtering**: The pipeline automatically bifurcates the data stream using a side-logic filter. It classifies transactions into `Standard`, `HighAmountTransaction`, or `OVERDRAFT_WARNING`.
-* **Web Control Service:** A Spring Boot app that embeds a Flink local MiniCluster and serves a dashboard for live data, configuration, and job lifecycle control — see below.
-* **Interrogate Mode:** Pause the live feed and inspect exactly how one transaction was processed — its partition key, real key-group/subtask routing, and a SQL-style walkthrough of the state read/update/classification logic.
+* **Web Control Service:** A Spring Boot app that embeds a Flink local MiniCluster and serves a dashboard for live data, configuration, and job lifecycle control (see below).
+* **Interrogate Mode:** Pause the live feed and inspect exactly how one transaction was processed: its partition key, real key-group/subtask routing, and a SQL-style walkthrough of the state read/update/classification logic.
 
 ## 🛠️ Setup & Running
 
 1. **Clone the repo:**
    ```
-   git clone https://github.com/mitchellg3/flink-transaction-processor.git
+   git clone https://github.com/perlfox/visual-flink-transactions.git
    cd flink-transaction-processor
    ```
 
