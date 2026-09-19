@@ -3,8 +3,9 @@
 This is a fork/extension of the Flink Bank Transaction Processor built by @mitchellg3.
 
 Big changes to the original:
-* **GUI/Visualization** Web based interface to start, stop and configure the simulation
-* **Flink Introspection** Details as to keying, state, classification.  Note that SQL shown is a representation as this project actually calls the Datastream API.
+* **GUI/Visualization** -- Web based interface to start, stop and configure the simulation
+* **Flink Introspection** -- Details as to keying, state, classification.  Note that SQL shown is a representation as this project actually calls the Datastream API.
+
 The original code is available at https://github.com/mitchellg3/flink-transaction-processor.git
 ## Screenshots
 Demo Visualization
@@ -38,7 +39,7 @@ sources and sinks). **This is built on Flink 1.20**
 1. **Clone the repo:**
    ```
    git clone https://github.com/perlfox/visual-flink-transactions.git
-   cd flink-transaction-processor
+   cd visual-flink-transactions
    ```
 
 2. **New machine? Install dependencies first:** `./setup.sh` installs everything this project needs (git, a JDK 21, Maven, Python 3) via your OS package manager, then runs `./run doctor` to finish Maven setup. Pass `-y` to skip prompts (e.g. for a fresh VM or container: `./setup.sh -y`). If you already have Java 21, Maven, and Python 3 on PATH, you can skip this step.
