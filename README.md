@@ -15,6 +15,9 @@ Demo Visualization
 Introspection
 <img width="700" height="994" alt="Screenshot From 2026-09-19 11-37-31" src="https://github.com/user-attachments/assets/8c85895d-282c-4f7f-a529-f52ca8169548" />
 
+Live Feed
+<img width="1049" height="640" alt="image" src="https://github.com/user-attachments/assets/8dbc2bdd-7d1d-4799-a5e6-d537bf5963c4" />
+
 Control GUI
 <img width="961" height="615" alt="Screenshot From 2026-09-19 11-39-58" src="https://github.com/user-attachments/assets/fd78dcfd-688e-4b26-b958-549577bb28ce" />
 
