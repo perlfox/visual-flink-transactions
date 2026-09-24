@@ -10,6 +10,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
+import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -31,6 +32,9 @@ public class FlinkJobManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkJobManager.class);
     private static final String JOB_NAME = "Transaction Processor with State";
+
+    /** Port Flink's own Web UI binds to; 8080 belongs to this Spring Boot service. */
+    private static final int FLINK_WEB_UI_PORT = 8081;
 
     private final LiveDataStore liveDataStore;
     private final TransactionEventBus.TransactionListener eventListener;
@@ -75,7 +79,11 @@ public class FlinkJobManager {
             Configuration flinkConfig = new Configuration();
             flinkConfig.set(TaskManagerOptions.TOTAL_PROCESS_MEMORY, MemorySize.ofMebiBytes(config.taskManagerMemoryMb));
 
-            StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(config.parallelism, flinkConfig);
+            // Serves Flink's own Web UI (DAG, checkpoint history, per-subtask metrics) off the
+            // MiniCluster. Spring Boot already owns 8080, so the REST endpoint goes to 8081.
+            flinkConfig.set(RestOptions.PORT, FLINK_WEB_UI_PORT);
+            StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(flinkConfig);
+            env.setParallelism(config.parallelism);
             env.enableCheckpointing(config.checkpointIntervalMs);
             env.getCheckpointConfig().setCheckpointingMode(
                     "AT_LEAST_ONCE".equals(config.checkpointingMode) ? CheckpointingMode.AT_LEAST_ONCE : CheckpointingMode.EXACTLY_ONCE);

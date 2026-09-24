@@ -53,6 +53,14 @@
             <version>${flink.version}</version>
         </dependency>
 
+        <!-- Serves Flink's own Web UI from the embedded MiniCluster. Without this on the
+             classpath, createLocalEnvironmentWithWebUI() silently starts no UI. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-runtime-web</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
